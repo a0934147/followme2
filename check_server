@@ -1,0 +1,426 @@
+#!/bin/bash
+
+declare servers[0]="git.htc.com"
+declare servers[1]="tpe.git.htc.com"
+declare servers[2]="tao.git.htc.com"
+declare servers[3]="hcu.git.htc.com"
+declare servers[4]="andssd4.mirror-shanghai1.htc.com"
+declare keys[0]="[git.htc.com]:29419 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCaCwwkEIiZAngFOZ8ViDD3gFYjhX1+UROKRtBBLrQVAOPCdUlp86DwyoCWdzRWtfUx5Fgu5FXJAXlZCqZdEoA1SoTKzXEd6aqK9+Rc+/HJ2sXE+p/FvSsyTXazSrAOwUiTTO1438RxvohhpkZ1+xljzNggti0KVGpG+SaBftiEgw=="
+declare keys[1]="[tpe.git.htc.com]:29419 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCaCwwkEIiZAngFOZ8ViDD3gFYjhX1+UROKRtBBLrQVAOPCdUlp86DwyoCWdzRWtfUx5Fgu5FXJAXlZCqZdEoA1SoTKzXEd6aqK9+Rc+/HJ2sXE+p/FvSsyTXazSrAOwUiTTO1438RxvohhpkZ1+xljzNggti0KVGpG+SaBftiEgw=="
+declare keys[2]="[tao.git.htc.com]:29419 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCaCwwkEIiZAngFOZ8ViDD3gFYjhX1+UROKRtBBLrQVAOPCdUlp86DwyoCWdzRWtfUx5Fgu5FXJAXlZCqZdEoA1SoTKzXEd6aqK9+Rc+/HJ2sXE+p/FvSsyTXazSrAOwUiTTO1438RxvohhpkZ1+xljzNggti0KVGpG+SaBftiEgw=="
+declare keys[3]="[hcu.git.htc.com]:29419 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCaCwwkEIiZAngFOZ8ViDD3gFYjhX1+UROKRtBBLrQVAOPCdUlp86DwyoCWdzRWtfUx5Fgu5FXJAXlZCqZdEoA1SoTKzXEd6aqK9+Rc+/HJ2sXE+p/FvSsyTXazSrAOwUiTTO1438RxvohhpkZ1+xljzNggti0KVGpG+SaBftiEgw=="
+declare keys[4]="[shh1.aosp.git.htc.com]:29419 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+Qjs6cifGKzABXlKUKucWaGfDM5lb3LxMYoJuHyyapZxHEOq6ycYYQFnY9QvHSJtRnQsgm8JPrZAlexg7lQSzHxan5X1ZfK7j3Qb90vKKTJfEjlaaIxoDmzMVH6AIZHMbPRtYtorOpvXuRl/xWcaObPLyfUFTVBTOzoysQrLcC4Z82uCR1+X6SvvzH3Ej2YcAoVOPKLfzrusDruMKwXv3Gm4UqPuSXuZ5dnKF4mFKy0+rSIkt8Dgq73MwXzNWJAqj90frHJS+8LoTVo7t3L4OOApv3LDKQJbx1kab7uMMub07X3cCUB5pwkBfP8jMOwH3vMU7wKPJ2M6em+TqkRAf"
+declare script_version="V1.6"
+declare review_port="8081"
+declare ssh_port="29419"
+declare ssh_path="$HOME/.ssh"
+declare repo_path="/usr/local/bin/repo"
+declare env_log_path="/tmp/gerrit_env_log.$(date +%Y%m%d)"
+declare work_space=""
+declare user_mail=""
+declare user_id=""
+declare mirror=""
+
+function success_msg ()
+{
+    msg="==== O. Your Environment Checking for HTC Gerrit Server is All Pass"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo "1. You Should repo init/repo sync Again by Yourself Using following Commands:"
+    echo "      $ cd WORKSPACE"
+    echo "      $ repo init -u ssh://YOUR_ID@MIRROR_DOMAIN:SSH_PORT/manifest.git -m MANIFEST.XML -b htc"
+    echo "      $ repo sync"
+    echo "      ex:"
+    echo "      $ cd $work_space"
+    echo "      $ repo init -u ssh://$user_id@$mirror:$ssh_port/manifest.git -m ics-mr1-rel_gep_qct8930.xml -b htc"
+    echo "      $ repo sync"
+    echo ""
+    echo "2. More HTC Gerrit Server Info:"
+    echo "    http://wiki-ateam.htc.com/mediawiki/index.php/ICS_Gerrit_Server_Info"
+}
+
+function fail_msg ()
+{
+    echo ""
+    msg="==== X. Your Environment Checking is Failed"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo "1. Follow the Last Script Hints to modify your settings, and try again."
+    echo ""
+    echo "2. Check more Info on Server Q&A:"
+    echo "    http://wiki-ateam.htc.com/mediawiki/index.php/ICS_Gerrit_Q&A"
+    echo ""
+    echo "3. If all proecsses are still not working...(Although I don't beleve it)"
+    echo "    Please send $env_log_path to Gerrit Administrators to check"
+}
+
+function test_repo_init_history ()
+{
+    msg="==== 9. Check Repo Init History"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo "Your repo init command history:"
+    hist="$(cat $HOME/.bash_history |grep "repo init -u " |tail -10)"
+    echo "$hist" && echo "$hist" >> $env_log_path
+    echo ""
+    [ "$(echo $hist |grep $user_id)" == "" ] &&
+    msg="Warn: You should run repo init command with YOUR_ID:$user_id" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: Setup WORKSPACE config only" &&
+    echo "    : $ cd WORKSPACE" &&
+    echo "    : $ repo init -u ssh://YOUR_ID@MIRROR_DOMAIN:SSH_PORT/manifest.git -m MANIFEST.XML -b htc" &&
+    echo "    : ex:" &&
+    echo "    : $ cd $work_space" &&
+    echo "    : $ repo init -u ssh://$user_id@$mirror:$ssh_port/manifest.git -m ics-mr1-rel_gep_qct8930.xml -b htc" &&
+    read -p "(Press Enter to continue...)" &&
+    echo ""
+}
+
+function test_git_config ()
+{
+    msg="==== 8. Check Git Config For Repo Upload"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo "Your ID/MAIL in $HOME/.gitconfig:"
+    git_user_id="$(git config --global --get user.name)"
+    git_user_mail="$(git config --global --get user.email)"
+    echo "${git_user_id}" && echo "${git_user_id}" >> $env_log_path
+    echo "${git_user_mail}" && echo "${git_user_mail}" >> $env_log_path
+    echo ""
+
+    [ "$git_user_id" != "$user_id" -o "$git_user_mail" != "$user_mail" ] &&
+    msg="Warn: YOUR_ID/YOUR_MAIL \"${user_id}\"/\"${user_mail}\" is not consistent with \"${git_user_id}\"/\"${git_user_mail}\" in $HOME/.gitconfig" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "It may cause you repo upload/git push fail!!" &&
+    echo "Hint: Setup Global config:" &&
+    echo "    : $ git config --global user.name \"YOUR_ID\"" &&
+    echo "    : $ git config --global user.name \"YOUR_MAIL\"" &&
+    echo "or"
+    echo "Hint: Setup WORKSPACE config only" &&
+    echo "    : $ cd WORKSPACE" &&
+    echo "    : $ repo init -u ssh://YOUR_ID@MIRROR_DOMAIN:SSH_PORT/manifest.git -m MANIFEST.XML -b htc --config-name" &&
+    echo "    : ex:" &&
+    echo "    : $ cd $work_space" &&
+    echo "    : $ repo init -u ssh://$user_id@$mirror:$ssh_port/manifest.git -m ics-mr1-rel_gep_qct8930.xml -b htc --config-name" &&
+    read -p "(Press Enter to continue...)" &&
+    echo ""
+
+    if [ -f "$HOME/.git-template" ]; then
+        msg="$HOME/.git-template exists"
+        echo "$msg" && echo "$msg" >> $env_log_path
+        eval "cat $HOME/.git-template >> $env_log_path"
+        echo ""
+    else
+        msg="Warn: $HOME/.git-template not found"
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "It may cause you repo upload/git push fail!!" &&
+        echo "Hint: $ cd $HOME" &&
+        echo "    : $ wget http://git.htc.com/.git-template" &&
+        echo "    : $ git config --global commit.template $HOME/.git-template" &&
+        read -p "(Press Enter to continue...)" &&
+        echo ""
+    fi
+}
+
+function test_user_permission ()
+{
+    msg="==== 7. Check User Permission"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    for int in $(seq 0 1)
+    do
+        test_server="${servers[0]}"
+        [ "$int" == "1" ] && test_server="$mirror"
+        msg="Testing Command:$ ssh -p${ssh_port} ${user_id}@${test_server} gerrit ls-groups -u ${user_id}"
+        echo "$msg" && echo "$msg" >> $env_log_path
+        eval "ssh -p${ssh_port} ${user_id}@${test_server} gerrit ls-groups -u ${user_id}"
+        echo ""
+    done
+}
+
+function test_server_connection ()
+{
+    msg="==== 6. Check Server Ssh Connection"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    for int in $(seq 0 1)
+    do
+        test_server="${servers[0]}"
+        [ "$int" == "1" ] && test_server="$mirror"
+        msg="Testing Command:$ ssh -p${ssh_port} ${user_id}@${test_server}"
+        echo "$msg" && echo "$msg" >> $env_log_path
+        eval "ssh -p${ssh_port} ${user_id}@${test_server}"
+        eval "ssh -p${ssh_port} ${user_id}@${test_server} >> $env_log_path 2>&1"
+        echo ""
+
+        [ "$(tail -1 $env_log_path |grep "Permission denied")" != "" ] &&
+        msg="Error: YOUR_ID \"${user_id}\" is invalid or $ssh_path/id_rsa.pub is not match in ${test_server}" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "Hint: If \"${user_id}\" is invalid:" &&
+        echo "    : please run script again and input vaild hTC mail address with All lowercase" &&
+        echo "Hint: If \"${user_id}\" is valid:" &&
+        echo "    : Paste $ssh_path/id_rsa.pub in http://${test_server}:$review_port/#/settings/ssh-keys" &&
+        msg="YOUR_SSH_PUBLIC_KEY in $ssh_path/id_rsa.pub:" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        msg="$(cat "$ssh_path/id_rsa.pub")" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "" &&
+        fail_msg && exit 1
+    done
+}
+
+function test_server_ssh_key ()
+{
+    msg="==== 5. Check Server Ssh Key"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    msg="Checking $ssh_path/known_hosts ..."
+    echo "$msg" && echo "$msg" >> $env_log_path
+    [ ! -f "$ssh_path/known_hosts" ] &&
+    msg="Warn: $ssh_path/known_hosts not Found" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    msg="Create empty $ssh_path/known_hosts" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    `touch $ssh_path/known_hosts`
+
+    for int in $(seq 0 $((${#servers[@]}-1)))
+    do
+        temp_key="$(echo ${keys[$int]} |sed "s|\[|\\\[|g" |sed "s|\]|\\\]|g")"
+        msg="Checking Server Key $int"
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        [ "$(cat $ssh_path/known_hosts |grep "$temp_key")" == "" ] &&
+        msg="Insert Server Key $int into $ssh_path/known_hosts" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "${keys[$int]}" >> $ssh_path/known_hosts
+    done
+
+    echo ""
+}
+
+function test_local_ssh_key ()
+{
+    msg="==== 4. Check Local Ssh Key"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    msg="Checking $ssh_path ..."
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo ""
+    if [ -d "$ssh_path" ]; then
+        [ "$(find "$ssh_path" -perm "0700")" != "$ssh_path" ] &&
+        echo "change mode to 0700 on $ssh_path" && `chmod 0700 $ssh_path` &&
+        echo ""
+    else
+        msg="Error: Folder $ssh_path to keep ssh key not found" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "Hint: $ mkdir -p $ssh_path && chmod 0700 $ssh_path" &&
+        fail_msg && exit 1
+    fi
+
+    msg="Checking $ssh_path/id_rsa & $ssh_path/id_rsa.pub ..."
+    echo "$msg" && echo "$msg" >> $env_log_path
+    echo ""
+    if [ -f "$ssh_path/id_rsa" -a -f "$ssh_path/id_rsa.pub" ]; then
+        [ "$(find "$ssh_path/id_rsa" -perm "0400")" != "$ssh_path/id_rsa" ] &&
+        echo "change mode to 0400 on $ssh_path/id_rsa" && `chmod 0400 $ssh_path/id_rsa` &&
+        echo ""
+
+        [ "$(find "$ssh_path/id_rsa.pub" -perm "0644")" != "$ssh_path/id_rsa.pub" ] &&
+        echo "change mode to 0644 on $ssh_path/id_rsa.pub" && `chmod 0644 $ssh_path/id_rsa.pub` &&
+        echo ""
+    else
+        msg="Error: ssh key $ssh_path/id_rsa or $ssh_path/id_rsa.pub not found" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "Hint: $ ssh-keygen -t rsa -f $ssh_path/id_rsa" &&
+        echo "    : $ ssh-agent bash" &&
+        echo "    : $ ssh-add $ssh_path/id_rsa" &&
+        fail_msg && exit 1
+    fi
+
+    msg="$(cat "$ssh_path/id_rsa.pub")" &&
+    echo "$msg" >> $env_log_path
+}
+
+function test_mirror_speed ()
+{
+    msg="==== 3. Select One Fastest Mirror"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    speed[0]=$(ping -c2 ${servers[0]} |grep "avg" |cut -d' ' -f4 |cut -d'/' -f2)
+    echo "Main Server:        ${servers[$int]} ping speed: ${speed[$int]} ms"
+    echo "Mirr Server:"
+    fast=1
+    for int in $(seq 1 $((${#servers[@]}-1)))
+    do
+        speed[$int]=$(ping -c2 ${servers[$int]} |grep "avg" |cut -d' ' -f4 |cut -d'/' -f2)
+        [ "${speed[$int]}" == "" ] && speed[$int]="99999"
+        echo "[$int] ${servers[$int]} ping speed: ${speed[$int]} ms"
+        tmp1=$(($(echo ${speed[$int]} |sed "s|\..*$||g")*1000 + 10#$(echo ${speed[$int]} |sed "s|^.*\.||g")))
+        tmp0=$(($(echo ${speed[$fast]} |sed "s|\..*$||g")*1000 + 10#$(echo ${speed[$fast]} |sed "s|^.*\.||g")))
+        [ "$tmp0" -ge "$tmp1" ] && fast="$int"
+    done
+    echo ""
+    msg="Fast mirror for you is:[$fast] ${servers[$fast]} ping speed: ${speed[$fast]} ms"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    read -p "Input the Mirror Number(1~$((${#servers[@]}-1))) you like: " selected
+
+    [ "$(echo $selected |grep "[[:digit:]]")" == "" ] && 
+    msg="Error: Input is not Digit: $selected" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: Input the Mirror Number(1~$((${#servers[@]}-1)))" &&
+    fail_msg && exit 1
+    [ "$selected" -gt "$((${#servers[@]}-1))" -o "$selected" -lt "1" ] &&
+    msg="Error: No such mirror number: $selected" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: Input the Mirror Number(1~$((${#servers[@]}-1)))" &&
+    fail_msg && exit 1
+
+    mirror="${servers[$selected]}"
+    msg="Selected Mirror: $mirror" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo ""
+}
+
+function test_user_mail ()
+{
+    msg="==== 2. Test User Name And Mail"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    read -p "Input your hTC mail address with lowercase: " user_mail
+    user_id="$(echo $user_mail |sed "s|@.*$||g")"
+    msg="YOUR_ID: $user_id  YOUR_MAIL: $user_mail"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    echo ""
+    ( ([ "$(echo $user_mail |sed "s|^.*@||g")" != "htc.com" ] &&
+        msg="Error: YOUR_MAIL \"$user_mail\" is not from htc !" &&
+        echo "$msg" && echo "$msg" >> $env_log_path) ||
+        ([ "$(echo $user_mail |grep -v "[[:upper:]]" |grep -v "[[:space:]]")" == "" ] &&
+        msg="Error: YOUR_ID \"$user_id\" isn't with lowercase or with space" &&
+        echo "$msg" && echo "$msg" >> $env_log_path) ) &&
+    echo "Hint: Input vaild hTC mail address with All lowercase" &&
+    echo "Example: aa.bb_cc@htc.com" &&
+    fail_msg && exit 1
+}
+
+function test_tools ()
+{
+    git_limit="1.7.2"
+    git_limit_val="$(echo $git_limit |sed "s|\.||g")"
+    python_limit="2.6.0"
+    python_limit_val="$(echo $python_limit |sed "s|\.||g")"
+    repo_limit="1.20"
+    repo_limit_val="$(echo $repo_limit |sed "s|\.||g")"
+
+    msg="==== 1. Check Tools"
+    echo "$msg" && echo "$msg" >> $env_log_path
+
+    git_ver0=$(git --version 2>&1)
+    [ "$?" != "0" ] &&
+    msg="Error: You didn't install \"git\" tool" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: $ sudo apt-get install git-core" &&
+    fail_msg && exit 1
+
+    git_ver1=$(git --version |sed "s|^.* ||g")
+    v1=$(echo $git_ver1 |awk -F "." '{print $1}')
+    v2=$(echo $git_ver1 |awk -F "." '{print $2}')
+    v3=$(echo $git_ver1 |awk -F "." '{print $3}')
+    [ "$v3" == "" ] && v3="0"
+    git_ver_val=$((${v1:0:1}*100 + ${v2:0:1}*10 + ${v3:0:1}))
+    [ ! "$git_ver_val" -ge "$git_limit_val" ] &&
+    msg="Error: git version ($git_ver1) should be greater than $git_limit" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    fail_msg && exit 1
+
+    msg="$git_ver0" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo ""
+
+    python_ver0=$(python --version 2>&1)
+    [ "$?" != "0" ] &&
+    msg="Error: You didn't install \"python\" tool" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: $ sudo apt-get install python" &&
+    fail_msg && exit 1
+
+    python_ver1=$(python --version 2>&1 |sed "s|^.* ||g")
+    v1=$(echo $python_ver1 |awk -F "." '{print $1}')
+    v2=$(echo $python_ver1 |awk -F "." '{print $2}')
+    v3=$(echo $python_ver1 |awk -F "." '{print $3}')
+    [ "$v3" == "" ] && v3="0"
+    python_ver_val=$((${v1:0:1}*100 + ${v2:0:1}*10 + ${v3:0:1}))
+    [ ! "$python_ver_val" -ge "$python_limit_val" ] &&
+    msg="Error: python version ($python_ver1) should be greater than $python_limit to prevent potential repo sync problem" &&
+#    [ ! "$python_ver_val" -ge "$python_limit_val" -o ! "$python_ver_val" -lt "$((python_limit_val + 10))" ] &&
+#    msg="Error: python version ($python_ver1) should be 2.6.x to prevent potential repo sync problem" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: $ sudo apt-get install python2.6" &&
+    echo "      $ sudo rm -rf /usr/bin/python" &&
+    echo "      $ sudo ln -s /usr/bin/python2.6 /usr/bin/python" &&
+    fail_msg && exit 1
+
+    msg="$python_ver0" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo ""
+
+    repo_ver0=$(cat $repo_path 2>&1 |grep "^VERSION" )
+    [ "$?" != "0" ] &&
+    msg="Error: You didn't install \"repo\" launcher" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo "Hint: $ sudo apt-get install curl wget" &&
+    echo "      $ curl http://commondatastorage.googleapis.com/git-repo-downloads/repo > $HOME/repo" &&
+    echo "      $ chmod +x $HOME/repo" &&
+    echo "      $ sudo mv $HOME/repo $repo_path" &&
+    fail_msg && exit 1
+
+    repo_ver1=$(cat $repo_path 2>&1 |grep "^VERSION" |sed "s|^.*= (||g" |sed "s|)||g" |sed "s| ||g" |sed "s|,|\.|g")
+    v1=$(echo $repo_ver1 |awk -F "." '{print $1}')
+    v2=$(echo $repo_ver1 |awk -F "." '{print $2}')
+    v3=$(echo $repo_ver1 |awk -F "." '{print $3}')
+    [ "$v3" == "" ] && v3="0"
+    repo_ver_val=$((${v1:0:1}*100 + ${v2:0:1}*10 + ${v3:0:1}))
+    [ ! "$repo_ver_val" -ge "$repo_limit_val" ] &&
+    msg="Error: repo launcher version ($repo_ver1) should be greater than $repo_limit" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    fail_msg && exit 1
+
+    msg="repo launcher version $repo_ver1" &&
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+    echo ""
+}
+
+function test_workspace ()
+{
+    msg="==== 0. Check Workspace"
+    echo "$msg" && echo "$msg" >> $env_log_path
+    work_space="$(pwd)"
+    temp_space="$work_space"
+
+    msg="Checking Workspace: $work_space ..."
+    echo "$msg" && echo "$msg" >> $env_log_path &&
+
+    while [ "$temp_space" != "/" ]
+    do
+        temp_space="$(dirname $temp_space)"
+        echo "Checking $temp_space ..."
+
+        [ -d "$temp_space"/.repo ] &&
+        msg="Error: It's illegal to keep "$temp_space"/.repo" &&
+        echo "$msg" && echo "$msg" >> $env_log_path &&
+        echo "Hint: Create another workspace which is not under "$temp_space"" &&
+        fail_msg && exit 1
+    done
+    echo ""
+}
+
+cd `dirname $0`
+[ ! -d "$(dirname $env_log_path)" ] && env_log_path="$HOME/gerrit_env_log.$(date +%Y%m%d)"
+echo `date --rfc-3339="seconds"` > $env_log_path
+
+test_workspace
+test_tools
+test_user_mail
+test_mirror_speed
+test_local_ssh_key
+test_server_ssh_key
+test_server_connection
+test_user_permission
+test_git_config
+test_repo_init_history
+success_msg
+exit 0
